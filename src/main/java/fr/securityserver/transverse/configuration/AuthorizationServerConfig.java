@@ -2,9 +2,10 @@ package fr.securityserver.transverse.configuration;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 import com.nimbusds.jose.jwk.JWKSet;
@@ -13,6 +14,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -37,6 +39,9 @@ import org.springframework.security.oauth2.server.authorization.config.ClientSet
 import org.springframework.security.oauth2.server.authorization.config.ProviderSettings;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 @Import(OAuth2AuthorizationServerConfiguration.class)
@@ -47,17 +52,16 @@ public class AuthorizationServerConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain authServerSecurityFilterChain(HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
-        return http.formLogin(Customizer.withDefaults()).build();
+        http.formLogin(Customizer.withDefaults());
+        return http.build();
     }
 
     // require authentication for all request : authorizeRequests.anyRequest().authenticated()
     // providing a form-based authentication: formLogin(defaults()) method
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.authorizeRequests(authorizeRequests ->
-                        authorizeRequests.anyRequest().authenticated()
-                )
-                .formLogin(Customizer.withDefaults());
+        http.authorizeRequests(authorize -> authorize.anyRequest().authenticated())
+            .formLogin(Customizer.withDefaults());
         return http.build();
     }
 
@@ -66,12 +70,12 @@ public class AuthorizationServerConfig {
     public RegisteredClientRepository registeredClientRepository() {
         // @formatter:off
         RegisteredClient loginClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId("login-client")
+                .clientId("login-client-oidc")
                 .clientSecret("{noop}openid-connect")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/login-client")
+                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/login-client-oidc")
                 .redirectUri("http://127.0.0.1:8080/authorized")
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
@@ -130,13 +134,6 @@ public class AuthorizationServerConfig {
     @Bean
     UserDetailsService users() {
         UserDetails user = User.builder()
-//                .passwordEncoder(s -> {
-//                    System.out.println(s);
-//                    String vatef = passwordEncoder().encode(s);
-//                    System.out.println(vatef);
-//                    System.out.println(passwordEncoder().encode("password"));
-//                    return vatef;
-//                })
                 .username("admin")
                 .password(passwordEncoder().encode("password"))
                 .authorities("USER")
@@ -148,4 +145,5 @@ public class AuthorizationServerConfig {
     public PasswordEncoder passwordEncoder() {
         return new Pbkdf2PasswordEncoder();
     }
+    //https://www.baeldung.com/spring-security-registration-password-encoding-bcrypt
 }
